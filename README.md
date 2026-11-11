@@ -1,106 +1,135 @@
-﻿# SOC Assistant - despliegue todo en uno
+﻿# SOC Assistant
 
-Este repositorio sirve para **descargar y arrancar SOC Assistant** en otro PC
-sin copiar el codigo fuente, sin base de datos y sin ficheros `.env`.
+SOC Assistant es una aplicación web pensada para el trabajo diario de un equipo
+SOC. Reúne en un mismo sitio las alertas, los casos y los informes, y añade un
+asistente de IA que puede responder preguntas usando el contexto de esos datos.
 
-La aplicacion va dentro de una unica imagen Docker:
+La idea es que puedas tener todo funcionando en una sola máquina, sin montar
+varios servicios a mano y sin depender de una nube externa para la IA. Los
+modelos de lenguaje se ejecutan dentro del propio contenedor.
 
-- PostgreSQL
-- Backend FastAPI
-- Frontend nginx
-- Ollama con los modelos de IA y embeddings
+Wazuh y Splunk son **opcionales**. Si tu empresa ya los tiene, puedes conectarlos
+desde la pantalla de **Integraciones**. Si no los tienes, la aplicación arranca
+igual y funciona con sus alertas, casos, informes y asistente.
 
-La base de datos se crea vacia en el primer arranque. Los secretos
-(`JWT_SECRET`, `SECRET_KEY`, contrasena de PostgreSQL y de `admin`) se generan
-automaticamente dentro del contenedor y se guardan en el volumen
-`soc_assistant_certs`.
+## Qué incluye
 
-> Importante: este repositorio **no contiene la imagen Docker**. La imagen ya
-> esta publicada en GitHub Container Registry (GHCR) y es publica: no hace falta
-> cuenta de GitHub para descargarla. El repo solo contiene los scripts de
-> instalacion.
+La imagen Docker es todo-en-uno:
 
-> Si solo quieres instalar SOC Assistant, salta directamente a la seccion 3.
+- La interfaz web de SOC Assistant.
+- El backend y la base de datos PostgreSQL.
+- El asistente de IA local con Ollama y sus modelos.
+- Un certificado HTTPS autofirmado para acceder por la red interna.
 
-## 1. Publicar o actualizar la imagen (solo el propietario)
+La base de datos se crea vacía en el primer arranque. No se incluyen alertas,
+casos, informes, usuarios ni secretos de ninguna instalación anterior. Las
+contraseñas y claves se generan automáticamente la primera vez.
 
-En el PC donde ya existe `soc-assistant-allinone:latest`:
+## Antes de empezar
 
-```powershell
-docker tag soc-assistant-allinone:latest ghcr.io/artur0-dev/soc-assistant-allinone:latest
+Necesitas:
 
-$env:GH_TOKEN | docker login ghcr.io -u artur0-dev --password-stdin
+- Un PC con Docker instalado y funcionando.
+  - En Windows y macOS: Docker Desktop.
+  - En Linux: Docker Engine.
+- Unos **30–40 GB de espacio libre**. La imagen ocupa unos 23 GB y Docker
+  necesita espacio adicional para capas y volúmenes.
+- **16 GB de RAM recomendados**. Con menos memoria puede funcionar, pero el
+  asistente irá más lento.
+- Los puertos **80** y **443** libres. Si están ocupados, se pueden cambiar.
+- Opcionalmente, una GPU NVIDIA con NVIDIA Container Toolkit para que la IA
+  responda más rápido.
 
-docker push ghcr.io/artur0-dev/soc-assistant-allinone:latest
-```
+La primera vez hay que descargar la imagen desde GitHub Container Registry. No
+hace falta tener cuenta de GitHub ni ejecutar `docker login`.
 
-El usuario ya esta configurado como `artur0-dev`.
+## Instalación en Windows
 
-Despues, en GitHub:
+### 1. Instala Docker Desktop
 
-1. Entra en **Packages**.
-2. Abre `soc-assistant-allinone`.
-3. En **Settings**, pon la visibilidad en **Public** si quieres que cualquiera
-   pueda descargarla sin autenticarse.
+Descárgalo desde <https://www.docker.com/products/docker-desktop/> e instálalo.
+Si te ofrece usar WSL 2, acepta esa opción. Después de instalarlo, ábrelo y
+espera a que el motor de Docker esté en marcha.
 
-Si prefieres dejarla privada, en el PC destino tendran que ejecutar antes:
+### 2. Descarga este repositorio
 
-```powershell
-docker login ghcr.io
-```
-
-## 2. Repositorio ya configurado
-
-Este repositorio ya apunta a `artur0-dev`. No hay que cambiar ningun nombre
-antes de usarlo.
-
-## 3. Arrancar en el PC destino
-
-### Windows
-
-Requisitos:
-
-- Docker Desktop instalado y arrancado.
-- 30-40 GB libres.
-- Opcional: GPU NVIDIA con NVIDIA Container Toolkit.
+Con Git instalado:
 
 ```powershell
 git clone https://github.com/artur0-dev/soc-assistant-deploy.git
 cd soc-assistant-deploy
+```
 
+Si no tienes Git, entra en la página del repositorio, pulsa **Code** →
+**Download ZIP**, descomprime el archivo y abre una terminal dentro de la
+carpeta.
+
+### 3. Arranca SOC Assistant
+
+```powershell
 .\Iniciar-AllInOne.ps1
 ```
 
-Si Windows bloquea el script:
+Si Windows bloquea el script por la política de ejecución:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Iniciar-AllInOne.ps1
 ```
 
-El script:
+La primera vez puede tardar bastante, porque descarga la imagen completa. El
+script se encarga de:
 
-1. descarga la imagen,
-2. detecta la IP de red,
-3. crea los volumenes persistentes,
-4. arranca el contenedor,
-5. espera a que este sano,
-6. muestra la URL, el usuario `admin` y la contrasena generada.
+1. Descargar la imagen.
+2. Detectar la IP del equipo en la red local.
+3. Crear los volúmenes donde se guardan los datos.
+4. Arrancar el contenedor.
+5. Esperar a que la aplicación esté sana.
+6. Mostrar la URL, el usuario `admin` y la contraseña generada.
 
-Si no quieres usar un registry y prefieres mover el `.tar` por USB:
+Al terminar verás algo parecido a esto:
 
-```powershell
-docker load -i .\soc-assistant-allinone.tar
-.\Iniciar-AllInOne.ps1 -Image soc-assistant-allinone:latest -NoPull
+```text
+============================================================
+ SOC Assistant está listo
+ URL:              https://192.168.1.50
+ Usuario:          admin
+ Contraseña admin: xxxxxxxxxxxxxxxxxxxxxxxx
+
+ CA para clientes:
+   docker cp soc-assistant:/certs/ca.crt .\ca.crt
+============================================================
 ```
 
-### Linux o macOS
+Abre esa URL en el navegador. Si el navegador avisa de que el certificado no es
+de confianza, es normal: la app usa un certificado propio para la red interna.
+Más abajo se explica cómo instalar la CA en los equipos cliente.
+
+Para comprobar que el contenedor está sano:
+
+```powershell
+docker ps --filter name=soc-assistant
+```
+
+En la columna `STATUS` debe aparecer `healthy`. Si aparece `starting`, espera
+unos minutos: la primera vez tarda más porque arranca la base de datos y los
+modelos de IA.
+
+## Instalación en Linux
+
+Con Docker Engine instalado y tu usuario con permiso para usar `docker`:
 
 ```bash
+git clone https://github.com/artur0-dev/soc-assistant-deploy.git
+cd soc-assistant-deploy
 chmod +x iniciar-allinone.sh
 ./iniciar-allinone.sh
 ```
 
-O con Docker Compose:
+El script hace lo mismo que el de Windows. Si tu usuario no está en el grupo
+`docker`, tendrás que añadirlo o ejecutar Docker con los permisos adecuados.
+
+En macOS puedes usar Docker Desktop y el mismo script. Si la IP que detecta no
+es la correcta, arranca con Docker Compose indicando la IP manualmente:
 
 ```bash
 CERT_HOST_IPS="127.0.0.1,192.168.1.50" \
@@ -108,105 +137,113 @@ PUBLIC_URL="https://192.168.1.50" \
 docker compose up -d
 ```
 
-## 4. Que es `PUBLIC_URL`
+## Cómo entrar desde otro equipo
 
-`PUBLIC_URL` es la URL de **SOC Assistant**, no la de Wazuh ni la de Splunk.
+La URL que muestra el instalador es la que deben usar los demás equipos de la
+red. No uses `127.0.0.1` desde otro PC: esa dirección siempre apunta al propio
+equipo.
 
-Ejemplo:
+Si Windows Defender o el firewall del servidor preguntan si permitir Docker,
+acepta la regla para redes privadas.
 
-```text
-PUBLIC_URL=https://192.168.1.50
-```
+### Instalar el certificado en los clientes
 
-Si la empresa tiene otra IP, el script detecta automaticamente la IP del PC y
-genera el certificado para esa IP en el primer arranque. Tambien se puede
-indicar manualmente:
-
-```powershell
-.\Iniciar-AllInOne.ps1 -Force
-```
-
-Si la IP del servidor cambia despues del primer arranque, hay que regenerar el
-certificado para que incluya la nueva IP:
-
-```powershell
-.\Iniciar-AllInOne.ps1 -Force -RegenerateCerts
-```
-
-Eso genera una CA nueva; los equipos cliente tendran que volver a instalar
-`ca.crt`. Si no se regenera, la app sigue funcionando pero el navegador avisara
-de que el certificado no coincide con la IP.
-
-o, con Compose:
-
-```powershell
-$env:CERT_HOST_IPS="127.0.0.1,192.168.1.77"
-$env:PUBLIC_URL="https://192.168.1.77"
-docker compose up -d
-```
-
-Para regenerar certificados con Compose:
-
-```powershell
-$env:FORCE_CERTS="true"
-docker compose up -d
-```
-
-### Wazuh y Splunk
-
-Son conectores independientes y opcionales. No van en `PUBLIC_URL`.
-
-- Wazuh: se configura desde **Integraciones** con la URL, usuario y contrasena
-  del Wazuh de la empresa.
-- Splunk: igual, desde **Integraciones**.
-- Si no se configura ninguno, la app arranca y funciona con el resto de
-  funciones.
-
-Los parametros `-WazuhHost` y `-SplunkHost` del script solo anaden nombres de
-host al `/etc/hosts` del contenedor. Las credenciales reales se ponen en la
-interfaz.
-
-## 5. Puertos y acceso
-
-Por defecto:
-
-- `80/tcp` redirige a HTTPS.
-- `443/tcp` sirve la aplicacion.
-
-Si estan ocupados:
-
-```powershell
-.\Iniciar-AllInOne.ps1 -HttpPort 8080 -HttpsPort 8443
-```
-
-La URL sera `https://IP:8443`.
-
-Para instalar la CA en los equipos cliente:
+Para que el navegador no muestre el aviso de certificado, copia la CA desde el
+contenedor:
 
 ```powershell
 docker cp soc-assistant:/certs/ca.crt .\ca.crt
 ```
 
-## 6. Ver la contrasena de admin
+En Windows, haz doble clic en `ca.crt` → **Instalar certificado** → **Equipo
+local** → **Siguiente** → colócalo en **Entidades de certificación raíz de
+confianza** → **Finalizar**.
+
+En Linux, copia el archivo a `/usr/local/share/ca-certificates/` y ejecuta:
+
+```bash
+sudo update-ca-certificates
+```
+
+Si cambias la IP del servidor más adelante, el certificado dejará de coincidir.
+En ese caso vuelve a arrancar con:
+
+```powershell
+.\Iniciar-AllInOne.ps1 -Force -RegenerateCerts
+```
+
+Eso genera una CA nueva y tendrás que volver a instalarla en los clientes.
+
+## Wazuh y Splunk
+
+Son conectores independientes y opcionales. Se configuran desde la pantalla
+**Integraciones** de SOC Assistant:
+
+- **Wazuh**: URL, usuario y contraseña del Wazuh de tu empresa.
+- **Splunk**: URL y credenciales de Splunk.
+
+La variable `PUBLIC_URL` es la URL de SOC Assistant, no la de Wazuh ni la de
+Splunk. No las mezcles.
+
+Si no configuras ninguno de los dos, la aplicación funciona igual: puedes usar
+el asistente, las alertas, los casos y los informes con los datos que vayas
+creando.
+
+## Cambiar los puertos
+
+Por defecto se usan el 80 (redirige a HTTPS) y el 443. Si están ocupados:
+
+```powershell
+.\Iniciar-AllInOne.ps1 -HttpPort 8080 -HttpsPort 8443
+```
+
+La URL pasará a ser `https://IP:8443`.
+
+Con Docker Compose:
+
+```powershell
+$env:HTTP_PORT="8080"
+$env:HTTPS_PORT="8443"
+docker compose up -d
+```
+
+## Ver la contraseña de admin
+
+Si cierras la terminal y no apuntaste la contraseña:
 
 ```powershell
 docker exec soc-assistant sh -c ". /certs/.soc.env; echo \$ADMIN_PASSWORD"
 ```
 
-## 7. Datos y actualizaciones
+## Datos, actualizaciones y parada
 
-Los datos viven en los volumenes:
+Los datos se guardan en dos volúmenes de Docker:
 
 - `soc_assistant_pgdata`: base de datos.
-- `soc_assistant_certs`: certificados y secretos.
+- `soc_assistant_certs`: certificados y secretos generados.
 
-Para actualizar la imagen sin perder datos:
+Para actualizar a la última imagen sin perder los datos:
 
 ```powershell
 .\Iniciar-AllInOne.ps1 -Force
 ```
 
-Eso descarga la ultima imagen, recrea el contenedor y conserva los volumenes.
+Para parar y volver a arrancar:
+
+```powershell
+docker stop soc-assistant
+docker start soc-assistant
+```
+
+Para ver los logs en directo:
+
+```powershell
+docker logs -f soc-assistant
+```
+
+Si necesitas una copia de seguridad, detén el contenedor y copia esos dos
+volúmenes. No borres `soc_assistant_pgdata` ni `soc_assistant_certs` si quieres
+conservar la base de datos, los usuarios y los certificados.
 
 Para empezar de cero, borrando todos los datos:
 
@@ -216,33 +253,71 @@ docker volume rm soc_assistant_pgdata soc_assistant_certs
 .\Iniciar-AllInOne.ps1
 ```
 
-## 8. Que NO se sube a GitHub
+**Aviso:** eso elimina la base de datos, los casos, los informes, los usuarios y
+los certificados. No se puede deshacer.
 
-El `.gitignore` ya lo bloquea:
+## Problemas frecuentes
 
-```text
-.env
-.env.*
-certs/
-*.pem
-*.key
-*.crt
-*.tar
-*.tar.gz
-backups/
-pgdata/
-volumes/
-*.log
-ca.crt
+### Docker no está arrancado
+
+Abre Docker Desktop y espera a que termine de iniciarse. Luego vuelve a ejecutar
+el instalador.
+
+### El puerto 80 o 443 está ocupado
+
+Puede pasar si hay otro servidor web en el equipo. Usa otros puertos:
+
+```powershell
+.\Iniciar-AllInOne.ps1 -HttpPort 8080 -HttpsPort 8443
 ```
 
-El repositorio no contiene datos de alertas, informes, casos, usuarios ni
-secretos. La app arranca con la base vacia.
+### El contenedor no llega a estar sano
 
-## 9. Instrucciones para subir este repositorio a GitHub
+Mira los últimos logs:
 
-Estan en [`SUBIR_A_GITHUB.md`](SUBIR_A_GITHUB.md).
+```powershell
+docker logs --tail 200 soc-assistant
+```
 
-Las instrucciones detalladas para publicar la imagen en GHCR estan en
-[`PUBLICAR_GHCR.md`](PUBLICAR_GHCR.md).
+La primera vez puede tardar varios minutos mientras arrancan PostgreSQL, la IA y
+el resto de servicios.
 
+### El navegador avisa del certificado
+
+Es normal si todavía no has instalado `ca.crt`. Instálalo como se explica más
+arriba. Si la IP del servidor ha cambiado, regenera los certificados.
+
+### La IA va lenta
+
+Los modelos se ejecutan en local. Ayuda tener más RAM y una GPU NVIDIA. Sin GPU
+funciona, pero las respuestas pueden tardar más.
+
+### La descarga de la imagen falla
+
+Comprueba la conexión a Internet y vuelve a intentarlo. También puedes descargar
+la imagen a mano:
+
+```powershell
+docker pull ghcr.io/artur0-dev/soc-assistant-allinone:latest
+```
+
+## Estructura del repositorio
+
+```text
+Iniciar-AllInOne.ps1   Instalador para Windows
+iniciar-allinone.sh    Instalador para Linux/macOS
+docker-compose.yml     Alternativa para arrancar con Docker Compose
+```
+
+Este repositorio solo contiene los scripts de instalación. La aplicación y los
+modelos están en la imagen Docker publicada en GHCR.
+
+## ¿Dónde reporto un problema?
+
+Si algo no funciona, abre una incidencia en la pestaña **Issues** de este
+repositorio e incluye:
+
+- El sistema operativo.
+- La salida de `docker --version`.
+- Los últimos logs con `docker logs --tail 200 soc-assistant`.
+- Una descripción de lo que esperabas que pasara y lo que pasó.
