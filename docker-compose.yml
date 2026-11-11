@@ -1,0 +1,50 @@
+﻿# SOC Assistant todo-en-uno.
+#
+# No hay fichero .env en el repositorio. Los secretos se generan dentro del
+# contenedor la primera vez y quedan en el volumen soc_assistant_certs.
+#
+# En Windows se recomienda usar Iniciar-AllInOne.ps1, que detecta la IP.
+# En Linux/macOS se puede usar iniciar-allinone.sh o este compose.
+#
+# Para una IP concreta:
+#   PowerShell:  $env:CERT_HOST_IPS="127.0.0.1,192.168.1.50"; $env:PUBLIC_URL="https://192.168.1.50"; docker compose up -d
+#   Bash:        CERT_HOST_IPS="127.0.0.1,192.168.1.50" PUBLIC_URL="https://192.168.1.50" docker compose up -d
+#
+# PUBLIC_URL es la URL DE LA APP, no la de Wazuh ni Splunk.
+# Wazuh y Splunk se configuran despues desde la interfaz de Integraciones.
+
+services:
+  soc-assistant:
+    image: ${SOC_IMAGE:-ghcr.io/artur0-dev/soc-assistant-allinone:latest}
+    container_name: soc-assistant
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${HTTP_PORT:-80}:80"
+      - "${BIND_IP:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+    environment:
+      CERT_HOST_IPS: "${CERT_HOST_IPS:-127.0.0.1}"
+      CERT_HOST_DNS: "${CERT_HOST_DNS:-soc-assistant.local,localhost}"
+      PUBLIC_URL: "${PUBLIC_URL:-https://localhost}"
+      WAZUH_HOST: "${WAZUH_HOST:-}"
+      SPLUNK_HOST: "${SPLUNK_HOST:-}"
+      FORCE_CERTS: "${FORCE_CERTS:-}"
+    volumes:
+      - soc_assistant_pgdata:/var/lib/postgresql/data
+      - soc_assistant_certs:/certs
+    # Para GPU NVIDIA, descomenta la siguiente linea y quita el comentario
+    # de la seccion deploy. Requiere NVIDIA Container Toolkit.
+    # gpus: all
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  soc_assistant_pgdata:
+    name: soc_assistant_pgdata
+  soc_assistant_certs:
+    name: soc_assistant_certs
+
