@@ -311,13 +311,3 @@ docker-compose.yml     Alternativa para arrancar con Docker Compose
 
 Este repositorio solo contiene los scripts de instalación. La aplicación y los
 modelos están en la imagen Docker publicada en GHCR.
-
-## ¿Dónde reporto un problema?
-
-Si algo no funciona, abre una incidencia en la pestaña **Issues** de este
-repositorio e incluye:
-
-- El sistema operativo.
-- La salida de `docker --version`.
-- Los últimos logs con `docker logs --tail 200 soc-assistant`.
-- Una descripción de lo que esperabas que pasara y lo que pasó.
