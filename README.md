@@ -15,11 +15,14 @@ La base de datos se crea vacia en el primer arranque. Los secretos
 automaticamente dentro del contenedor y se guardan en el volumen
 `soc_assistant_certs`.
 
-> Importante: este repositorio **no contiene la imagen Docker**. La imagen se
-> publica en GitHub Container Registry (GHCR) o en otro registry. El repo solo
-> contiene los scripts de instalacion.
+> Importante: este repositorio **no contiene la imagen Docker**. La imagen ya
+> esta publicada en GitHub Container Registry (GHCR) y es publica: no hace falta
+> cuenta de GitHub para descargarla. El repo solo contiene los scripts de
+> instalacion.
 
-## 1. Publicar la imagen (solo el propietario)
+> Si solo quieres instalar SOC Assistant, salta directamente a la seccion 3.
+
+## 1. Publicar o actualizar la imagen (solo el propietario)
 
 En el PC donde ya existe `soc-assistant-allinone:latest`:
 
