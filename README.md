@@ -41,8 +41,12 @@ de Linux. Los comandos son los mismos.
 Copia y pega esta línea completa:
 
 ```bash
-docker run -d --name soc-assistant --restart unless-stopped -p 80:80 -p 443:443 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
+docker run -d --name soc-assistant --restart unless-stopped -p 127.0.0.1:80:80 -p 127.0.0.1:443:443 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
 ```
+
+Este comando publica la aplicación **solo en `127.0.0.1`**: se puede usar desde
+este mismo PC, pero no queda abierta al resto de la red. Si necesitas entrar
+desde otro equipo, mira la sección **Acceso desde otros equipos**.
 
 Docker descarga la imagen desde GitHub Container Registry y arranca todo
 automáticamente. No hace falta cuenta de GitHub ni `docker login`.
@@ -93,6 +97,10 @@ docker exec soc-assistant sh -c "grep ADMIN_PASSWORD /certs/.soc.env"
 ## Acceso desde otros equipos
 
 Si solo vas a usar SOC Assistant desde el mismo PC, no tienes que cambiar nada.
+
+Si necesitas que otros equipos de la red entren, tendrás que abrir la
+aplicación a la red. Es opcional y solo recomendable en una red de confianza:
+cualquier equipo que llegue al puerto verá la pantalla de login.
 
 Para entrar desde otro equipo de la red, abre:
 
@@ -145,12 +153,25 @@ docker compose up -d
 También puedes usar el botón **Code → Download ZIP** de GitHub y ejecutar
 `docker compose up -d` dentro de la carpeta descomprimida.
 
+Por defecto, el compose también publica la aplicación solo en `127.0.0.1`.
+Para abrirla al resto de la red:
+
+```bash
+BIND_IP=0.0.0.0 docker compose up -d
+```
+
+En Windows CMD sería:
+
+```cmd
+set BIND_IP=0.0.0.0 && docker compose up -d
+```
+
 ## Cambiar los puertos
 
 Si el 80 o el 443 están ocupados, usa otros puertos. Por ejemplo:
 
 ```bash
-docker run -d --name soc-assistant --restart unless-stopped -p 8080:80 -p 8443:443 -e PUBLIC_URL=https://localhost:8443 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
+docker run -d --name soc-assistant --restart unless-stopped -p 127.0.0.1:8080:80 -p 127.0.0.1:8443:443 -e PUBLIC_URL=https://localhost:8443 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
 ```
 
 La URL pasará a ser `https://localhost:8443`.
@@ -227,7 +248,7 @@ el servicio de Docker está activo.
 
 ### El puerto 80 o 443 está ocupado
 
-Usa otros puertos, por ejemplo `-p 8080:80 -p 8443:443`, y abre
+Usa otros puertos, por ejemplo `-p 127.0.0.1:8080:80 -p 127.0.0.1:8443:443`, y abre
 `https://localhost:8443`.
 
 ### El contenedor no llega a estar sano

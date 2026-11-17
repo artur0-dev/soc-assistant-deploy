@@ -9,6 +9,11 @@
 # PUBLIC_URL es la URL DE LA APP, no la de Wazuh ni Splunk.
 # Wazuh y Splunk se configuran despues desde la interfaz de Integraciones.
 #
+# Por defecto la app solo escucha en localhost (127.0.0.1).
+# Para abrirla al resto de la red:
+#   Windows CMD:  set BIND_IP=0.0.0.0 && docker compose up -d
+#   Linux/macOS:  BIND_IP=0.0.0.0 docker compose up -d
+#
 # Para incluir una IP concreta en el certificado:
 #   Windows CMD:       set CERT_HOST_IPS=127.0.0.1,192.168.1.50 && set PUBLIC_URL=https://192.168.1.50 && docker compose up -d
 #   Linux/macOS:       CERT_HOST_IPS="127.0.0.1,192.168.1.50" PUBLIC_URL="https://192.168.1.50" docker compose up -d
@@ -19,8 +24,8 @@ services:
     container_name: soc-assistant
     restart: unless-stopped
     ports:
-      - "${BIND_IP:-0.0.0.0}:${HTTP_PORT:-80}:80"
-      - "${BIND_IP:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+      - "${BIND_IP:-127.0.0.1}:${HTTP_PORT:-80}:80"
+      - "${BIND_IP:-127.0.0.1}:${HTTPS_PORT:-443}:443"
     environment:
       CERT_HOST_IPS: "${CERT_HOST_IPS:-127.0.0.1}"
       CERT_HOST_DNS: "${CERT_HOST_DNS:-soc-assistant.local,localhost}"
