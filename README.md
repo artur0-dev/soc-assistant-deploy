@@ -1,186 +1,198 @@
 ﻿# SOC Assistant
 
-SOC Assistant es una aplicación web pensada para el trabajo diario de un equipo
-SOC. Reúne en un mismo sitio las alertas, los casos y los informes, y añade un
-asistente de IA que puede responder preguntas usando el contexto de esos datos.
+SOC Assistant es una aplicación web para el trabajo diario de un equipo SOC.
+Reúne alertas, casos e informes, y añade un asistente de IA que responde
+preguntas usando el contexto de esos datos.
 
-La idea es que puedas tener todo funcionando en una sola máquina, sin montar
-varios servicios a mano y sin depender de una nube externa para la IA. Los
-modelos de lenguaje se ejecutan dentro del propio contenedor.
+Todo funciona en una sola máquina. La imagen Docker es **todo-en-uno**: incluye
+la interfaz web, el backend, PostgreSQL, Ollama con sus modelos y un certificado
+HTTPS para la red interna.
 
-Wazuh y Splunk son **opcionales**. Si tu empresa ya los tiene, puedes conectarlos
-desde la pantalla de **Integraciones**. Si no los tienes, la aplicación arranca
-igual y funciona con sus alertas, casos, informes y asistente.
-
-## Qué incluye
-
-La imagen Docker es todo-en-uno:
-
-- La interfaz web de SOC Assistant.
-- El backend y la base de datos PostgreSQL.
-- El asistente de IA local con Ollama y sus modelos.
-- Un certificado HTTPS autofirmado para acceder por la red interna.
+Wazuh y Splunk son **opcionales**. Si tu empresa ya los tiene, se conectan desde
+la pantalla de **Integraciones**. Si no los tienes, la aplicación arranca igual
+y funciona con sus alertas, casos, informes y asistente.
 
 La base de datos se crea vacía en el primer arranque. No se incluyen alertas,
 casos, informes, usuarios ni secretos de ninguna instalación anterior. Las
 contraseñas y claves se generan automáticamente la primera vez.
 
-## Antes de empezar
+## Instalación rápida: solo Docker
 
-Necesitas:
+No necesitas Git ni scripts. Solo Docker.
 
-- Un PC con Docker instalado y funcionando.
-  - En Windows y macOS: Docker Desktop.
-  - En Linux: Docker Engine.
-- Unos **30–40 GB de espacio libre**. La imagen ocupa unos 23 GB y Docker
-  necesita espacio adicional para capas y volúmenes.
-- **16 GB de RAM recomendados**. Con menos memoria puede funcionar, pero el
-  asistente irá más lento.
-- Los puertos **80** y **443** libres. Si están ocupados, se pueden cambiar.
-- Opcionalmente, una GPU NVIDIA con NVIDIA Container Toolkit para que la IA
-  responda más rápido.
+### 1. Instala Docker
 
-La primera vez hay que descargar la imagen desde GitHub Container Registry. No
-hace falta tener cuenta de GitHub ni ejecutar `docker login`.
+- **Windows y macOS:** instala [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+  Si te ofrece usar WSL 2, acepta esa opción. Después ábrelo y espera a que el
+  motor de Docker esté en marcha.
+- **Linux:** instala Docker Engine y asegúrate de que tu usuario puede ejecutar
+  `docker` (o usa `sudo`).
 
-## Instalación en Windows
+Necesitas unos **30-40 GB de espacio libre** y, recomendablemente, **16 GB de
+RAM**. La imagen ocupa unos 23 GB.
 
-### 1. Instala Docker Desktop
+### 2. Abre una terminal
 
-Descárgalo desde <https://www.docker.com/products/docker-desktop/> e instálalo.
-Si te ofrece usar WSL 2, acepta esa opción. Después de instalarlo, ábrelo y
-espera a que el motor de Docker esté en marcha.
+Puede ser la terminal de Docker Desktop, CMD, Terminal de macOS o la terminal
+de Linux. Los comandos son los mismos.
 
-### 2. Descarga este repositorio
+### 3. Ejecuta este comando
 
-Con Git instalado:
+Copia y pega esta línea completa:
 
-```powershell
-git clone https://github.com/artur0-dev/soc-assistant-deploy.git
-cd soc-assistant-deploy
+```bash
+docker run -d --name soc-assistant --restart unless-stopped -p 80:80 -p 443:443 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
 ```
 
-Si no tienes Git, entra en la página del repositorio, pulsa **Code** →
-**Download ZIP**, descomprime el archivo y abre una terminal dentro de la
-carpeta.
+Docker descarga la imagen desde GitHub Container Registry y arranca todo
+automáticamente. No hace falta cuenta de GitHub ni `docker login`.
 
-### 3. Arranca SOC Assistant
+La primera vez puede tardar bastante porque la imagen es grande. Puedes ver el
+progreso con:
 
-```powershell
-.\Iniciar-AllInOne.ps1
+```bash
+docker logs -f soc-assistant
 ```
 
-Si Windows bloquea el script por la política de ejecución:
+### 4. Espera a que esté listo
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Iniciar-AllInOne.ps1
-```
-
-La primera vez puede tardar bastante, porque descarga la imagen completa. El
-script se encarga de:
-
-1. Descargar la imagen.
-2. Detectar la IP del equipo en la red local.
-3. Crear los volúmenes donde se guardan los datos.
-4. Arrancar el contenedor.
-5. Esperar a que la aplicación esté sana.
-6. Mostrar la URL, el usuario `admin` y la contraseña generada.
-
-Al terminar verás algo parecido a esto:
-
-```text
-============================================================
- SOC Assistant está listo
- URL:              https://192.168.1.50
- Usuario:          admin
- Contraseña admin: xxxxxxxxxxxxxxxxxxxxxxxx
-
- CA para clientes:
-   docker cp soc-assistant:/certs/ca.crt .\ca.crt
-============================================================
-```
-
-Abre esa URL en el navegador. Si el navegador avisa de que el certificado no es
-de confianza, es normal: la app usa un certificado propio para la red interna.
-Más abajo se explica cómo instalar la CA en los equipos cliente.
-
-Para comprobar que el contenedor está sano:
-
-```powershell
+```bash
 docker ps --filter name=soc-assistant
 ```
 
 En la columna `STATUS` debe aparecer `healthy`. Si aparece `starting`, espera
-unos minutos: la primera vez tarda más porque arranca la base de datos y los
-modelos de IA.
+unos minutos: la primera vez tarda más porque arranca PostgreSQL, la IA y el
+resto de servicios.
 
-## Instalación en Linux
+### 5. Abre la aplicación
 
-Con Docker Engine instalado y tu usuario con permiso para usar `docker`:
+En el mismo PC:
+
+```text
+https://localhost
+```
+
+Si el navegador avisa de que el certificado no es de confianza, es normal: la
+aplicación usa un certificado propio para la red interna. Puedes continuar.
+
+### 6. Usuario y contraseña
+
+El usuario es `admin`. La contraseña se genera automáticamente y se muestra en
+los logs la primera vez:
+
+```bash
+docker logs soc-assistant
+```
+
+Busca la línea `Contrasena admin:`. Si ya no aparece, puedes consultarla así:
+
+```bash
+docker exec soc-assistant sh -c "grep ADMIN_PASSWORD /certs/.soc.env"
+```
+
+## Acceso desde otros equipos
+
+Si solo vas a usar SOC Assistant desde el mismo PC, no tienes que cambiar nada.
+
+Para entrar desde otro equipo de la red, abre:
+
+```text
+https://IP-DEL-SERVIDOR
+```
+
+Puedes ver la IP con `ipconfig` en Windows o `hostname -I` en Linux. El
+certificado está pensado para `localhost`, así que el navegador mostrará un
+aviso. Puedes continuar y la aplicación funcionará igual.
+
+Si quieres que el certificado incluya también la IP del servidor, recrea el
+contenedor indicando tu IP. Sustituye `192.168.1.50` por la IP real:
+
+```bash
+docker rm -f soc-assistant
+docker run -d --name soc-assistant --restart unless-stopped -p 80:80 -p 443:443 -e PUBLIC_URL=https://192.168.1.50 -e CERT_HOST_IPS=127.0.0.1,192.168.1.50 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
+```
+
+Si cambias la IP más adelante, tendrás que repetir ese paso y volver a instalar
+la CA en los equipos cliente.
+
+## Instalar el certificado en los clientes
+
+Para que el navegador no muestre el aviso, copia la CA desde el contenedor:
+
+```bash
+docker cp soc-assistant:/certs/ca.crt .
+```
+
+- **Windows:** doble clic en `ca.crt` → **Instalar certificado** → **Equipo
+  local** → **Siguiente** → **Entidades de certificación raíz de confianza** →
+  **Finalizar**.
+- **Linux:** copia el archivo a `/usr/local/share/ca-certificates/` y ejecuta
+  `sudo update-ca-certificates`.
+- **macOS:** abre el archivo con **Acceso a Llaveros** y marca la CA como
+  confiable.
+
+## Alternativa con Docker Compose
+
+Si prefieres usar un archivo, el repositorio incluye `docker-compose.yml`.
+Descarga el repositorio y ejecuta:
 
 ```bash
 git clone https://github.com/artur0-dev/soc-assistant-deploy.git
 cd soc-assistant-deploy
-chmod +x iniciar-allinone.sh
-./iniciar-allinone.sh
-```
-
-El script hace lo mismo que el de Windows. Si tu usuario no está en el grupo
-`docker`, tendrás que añadirlo o ejecutar Docker con los permisos adecuados.
-
-En macOS puedes usar Docker Desktop y el mismo script. Si la IP que detecta no
-es la correcta, arranca con Docker Compose indicando la IP manualmente:
-
-```bash
-CERT_HOST_IPS="127.0.0.1,192.168.1.50" \
-PUBLIC_URL="https://192.168.1.50" \
 docker compose up -d
 ```
 
-## Cómo entrar desde otro equipo
+También puedes usar el botón **Code → Download ZIP** de GitHub y ejecutar
+`docker compose up -d` dentro de la carpeta descomprimida.
 
-La URL que muestra el instalador es la que deben usar los demás equipos de la
-red. No uses `127.0.0.1` desde otro PC: esa dirección siempre apunta al propio
-equipo.
+## Cambiar los puertos
 
-Si Windows Defender o el firewall del servidor preguntan si permitir Docker,
-acepta la regla para redes privadas.
-
-### Instalar el certificado en los clientes
-
-Para que el navegador no muestre el aviso de certificado, copia la CA desde el
-contenedor:
-
-```powershell
-docker cp soc-assistant:/certs/ca.crt .\ca.crt
-```
-
-En Windows, haz doble clic en `ca.crt` → **Instalar certificado** → **Equipo
-local** → **Siguiente** → colócalo en **Entidades de certificación raíz de
-confianza** → **Finalizar**.
-
-En Linux, copia el archivo a `/usr/local/share/ca-certificates/` y ejecuta:
+Si el 80 o el 443 están ocupados, usa otros puertos. Por ejemplo:
 
 ```bash
-sudo update-ca-certificates
+docker run -d --name soc-assistant --restart unless-stopped -p 8080:80 -p 8443:443 -e PUBLIC_URL=https://localhost:8443 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
 ```
 
-Si cambias la IP del servidor más adelante, el certificado dejará de coincidir.
-En ese caso vuelve a arrancar con:
+La URL pasará a ser `https://localhost:8443`.
 
-```powershell
-.\Iniciar-AllInOne.ps1 -Force -RegenerateCerts
+## Actualizar sin perder datos
+
+Los datos se guardan en dos volúmenes de Docker:
+
+- `soc_assistant_pgdata`: base de datos.
+- `soc_assistant_certs`: certificados y secretos generados.
+
+Para actualizar:
+
+```bash
+docker pull ghcr.io/artur0-dev/soc-assistant-allinone:latest
+docker rm -f soc-assistant
 ```
 
-Eso genera una CA nueva y tendrás que volver a instalarla en los clientes.
+Después vuelve a ejecutar el comando de instalación. Los volúmenes se conservan.
+
+Con Docker Compose:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Parar, arrancar y ver logs
+
+```bash
+docker stop soc-assistant
+docker start soc-assistant
+docker logs -f soc-assistant
+```
 
 ## Wazuh y Splunk
 
 Son conectores independientes y opcionales. Se configuran desde la pantalla
 **Integraciones** de SOC Assistant:
 
-- **Wazuh**: URL, usuario y contraseña del Wazuh de tu empresa.
-- **Splunk**: URL y credenciales de Splunk.
+- **Wazuh:** URL, usuario y contraseña del Wazuh de tu empresa.
+- **Splunk:** URL y credenciales de Splunk.
 
 La variable `PUBLIC_URL` es la URL de SOC Assistant, no la de Wazuh ni la de
 Splunk. No las mezcles.
@@ -189,69 +201,19 @@ Si no configuras ninguno de los dos, la aplicación funciona igual: puedes usar
 el asistente, las alertas, los casos y los informes con los datos que vayas
 creando.
 
-## Cambiar los puertos
+## Copias de seguridad y borrado
 
-Por defecto se usan el 80 (redirige a HTTPS) y el 443. Si están ocupados:
+Para conservar los datos, no borres los volúmenes `soc_assistant_pgdata` ni
+`soc_assistant_certs`.
 
-```powershell
-.\Iniciar-AllInOne.ps1 -HttpPort 8080 -HttpsPort 8443
-```
+Para empezar de cero, borrando todo:
 
-La URL pasará a ser `https://IP:8443`.
-
-Con Docker Compose:
-
-```powershell
-$env:HTTP_PORT="8080"
-$env:HTTPS_PORT="8443"
-docker compose up -d
-```
-
-## Ver la contraseña de admin
-
-Si cierras la terminal y no apuntaste la contraseña:
-
-```powershell
-docker exec soc-assistant sh -c ". /certs/.soc.env; echo \$ADMIN_PASSWORD"
-```
-
-## Datos, actualizaciones y parada
-
-Los datos se guardan en dos volúmenes de Docker:
-
-- `soc_assistant_pgdata`: base de datos.
-- `soc_assistant_certs`: certificados y secretos generados.
-
-Para actualizar a la última imagen sin perder los datos:
-
-```powershell
-.\Iniciar-AllInOne.ps1 -Force
-```
-
-Para parar y volver a arrancar:
-
-```powershell
-docker stop soc-assistant
-docker start soc-assistant
-```
-
-Para ver los logs en directo:
-
-```powershell
-docker logs -f soc-assistant
-```
-
-Si necesitas una copia de seguridad, detén el contenedor y copia esos dos
-volúmenes. No borres `soc_assistant_pgdata` ni `soc_assistant_certs` si quieres
-conservar la base de datos, los usuarios y los certificados.
-
-Para empezar de cero, borrando todos los datos:
-
-```powershell
+```bash
 docker rm -f soc-assistant
 docker volume rm soc_assistant_pgdata soc_assistant_certs
-.\Iniciar-AllInOne.ps1
 ```
+
+Después vuelve a ejecutar el comando de instalación.
 
 **Aviso:** eso elimina la base de datos, los casos, los informes, los usuarios y
 los certificados. No se puede deshacer.
@@ -260,32 +222,30 @@ los certificados. No se puede deshacer.
 
 ### Docker no está arrancado
 
-Abre Docker Desktop y espera a que termine de iniciarse. Luego vuelve a ejecutar
-el instalador.
+Abre Docker Desktop y espera a que termine de iniciarse. En Linux comprueba que
+el servicio de Docker está activo.
 
 ### El puerto 80 o 443 está ocupado
 
-Puede pasar si hay otro servidor web en el equipo. Usa otros puertos:
-
-```powershell
-.\Iniciar-AllInOne.ps1 -HttpPort 8080 -HttpsPort 8443
-```
+Usa otros puertos, por ejemplo `-p 8080:80 -p 8443:443`, y abre
+`https://localhost:8443`.
 
 ### El contenedor no llega a estar sano
 
 Mira los últimos logs:
 
-```powershell
+```bash
 docker logs --tail 200 soc-assistant
 ```
 
-La primera vez puede tardar varios minutos mientras arrancan PostgreSQL, la IA y
-el resto de servicios.
+La primera vez puede tardar varios minutos mientras arrancan PostgreSQL, la IA
+y el resto de servicios.
 
 ### El navegador avisa del certificado
 
 Es normal si todavía no has instalado `ca.crt`. Instálalo como se explica más
-arriba. Si la IP del servidor ha cambiado, regenera los certificados.
+arriba. Si accedes desde otro PC, también es normal que el certificado no
+coincida con la IP; puedes continuar o regenerarlo indicando tu IP.
 
 ### La IA va lenta
 
@@ -294,20 +254,18 @@ funciona, pero las respuestas pueden tardar más.
 
 ### La descarga de la imagen falla
 
-Comprueba la conexión a Internet y vuelve a intentarlo. También puedes descargar
-la imagen a mano:
+Comprueba la conexión a Internet y vuelve a intentarlo:
 
-```powershell
+```bash
 docker pull ghcr.io/artur0-dev/soc-assistant-allinone:latest
 ```
 
 ## Estructura del repositorio
 
 ```text
-Iniciar-AllInOne.ps1   Instalador para Windows
-iniciar-allinone.sh    Instalador para Linux/macOS
-docker-compose.yml     Alternativa para arrancar con Docker Compose
+docker-compose.yml   Alternativa para arrancar con Docker Compose
+README.md            Esta guía
 ```
 
-Este repositorio solo contiene los scripts de instalación. La aplicación y los
-modelos están en la imagen Docker publicada en GHCR.
+Este repositorio solo contiene la forma de arrancar la imagen publicada en
+GHCR. La aplicación y los modelos están dentro de la imagen Docker.
