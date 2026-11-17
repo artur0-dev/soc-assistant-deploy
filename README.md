@@ -94,34 +94,88 @@ Busca la línea `Contrasena admin:`. Si ya no aparece, puedes consultarla así:
 docker exec soc-assistant sh -c "grep ADMIN_PASSWORD /certs/.soc.env"
 ```
 
-## Acceso desde otros equipos
+## Acceso desde un segundo equipo (opcional)
 
-Si solo vas a usar SOC Assistant desde el mismo PC, no tienes que cambiar nada.
-
-Si necesitas que otros equipos de la red entren, tendrás que abrir la
-aplicación a la red. Es opcional y solo recomendable en una red de confianza:
-cualquier equipo que llegue al puerto verá la pantalla de login.
-
-Para entrar desde otro equipo de la red, abre:
+Si la aplicación va a estar en el PC del cliente y quieres entrar también desde
+otro equipo tuyo, **no hace falta abrir el 443 a toda la red**. La forma
+recomendada es un túnel SSH: el segundo equipo se conecta por SSH al PC donde
+está la app y reenvía el puerto local de la aplicación.
 
 ```text
-https://IP-DEL-SERVIDOR
+PC del cliente (app)                       Segundo equipo
+127.0.0.1:443  <── túnel SSH ──  localhost:8443
 ```
 
-Puedes ver la IP con `ipconfig` en Windows o `hostname -I` en Linux. El
-certificado está pensado para `localhost`, así que el navegador mostrará un
-aviso. Puedes continuar y la aplicación funcionará igual.
+Así la app sigue cerrada a la red. Solo puede entrar quien tenga acceso SSH al
+PC del cliente y sepa crear el túnel. Si quieres limitarlo a esos dos equipos,
+permite el puerto SSH (22) solo desde la IP del segundo equipo.
 
-Si quieres que el certificado incluya también la IP del servidor, recrea el
-contenedor indicando tu IP. Sustituye `192.168.1.50` por la IP real:
+### 1. Prepara el servidor SSH en el PC del cliente
+
+**Windows 10/11:**
+
+1. Abre **Configuración → Aplicaciones → Características opcionales**.
+2. Pulsa **Agregar una característica**.
+3. Busca **Servidor OpenSSH** y instálalo.
+4. Abre **Servicios**, busca **OpenSSH SSH Server**, ponlo en **Automático** y
+   pulsa **Iniciar**.
+
+**Linux:**
 
 ```bash
-docker rm -f soc-assistant
-docker run -d --name soc-assistant --restart unless-stopped -p 80:80 -p 443:443 -e PUBLIC_URL=https://192.168.1.50 -e CERT_HOST_IPS=127.0.0.1,192.168.1.50 -v soc_assistant_pgdata:/var/lib/postgresql/data -v soc_assistant_certs:/certs ghcr.io/artur0-dev/soc-assistant-allinone:latest
+sudo apt install openssh-server
+sudo systemctl enable --now ssh
 ```
 
-Si cambias la IP más adelante, tendrás que repetir ese paso y volver a instalar
-la CA en los equipos cliente.
+Si el firewall del PC del cliente bloquea el puerto 22, permite TCP 22 solo
+desde la IP del segundo equipo. En Windows puedes hacerlo desde **Firewall de
+Windows Defender → Configuración avanzada → Reglas de entrada → Nueva regla →
+Puerto → TCP 22 → Permitir → Ámbito: estas direcciones IP**.
+
+### 2. Crea el túnel desde el segundo equipo
+
+En el segundo equipo, abre una terminal y ejecuta:
+
+```bash
+ssh -L 8443:127.0.0.1:443 USUARIO@IP_DEL_PC_CLIENTE
+```
+
+Sustituye:
+
+- `USUARIO` por el usuario de Windows o Linux del PC del cliente.
+- `IP_DEL_PC_CLIENTE` por la IP de ese PC en la red.
+
+La primera vez te pedirá aceptar la huella del servidor y la contraseña de ese
+usuario. Deja esa terminal abierta mientras uses la aplicación.
+
+### 3. Abre la aplicación desde el segundo equipo
+
+```text
+https://localhost:8443
+```
+
+El segundo equipo no necesita Docker ni tener SOC Assistant instalado. Solo
+necesita un cliente SSH y un navegador.
+
+Si quieres que no aparezca el aviso de certificado, copia la CA desde el PC del
+cliente y instálala en el segundo equipo:
+
+```bash
+docker cp soc-assistant:/certs/ca.crt .
+```
+
+La CA se copia en el PC del cliente y luego se instala en el segundo equipo.
+
+### Importante
+
+- No uses `-p 443:443` para esto. Eso abriría la app a cualquier equipo de la
+  red. El túnel funciona precisamente porque la app sigue en `127.0.0.1`.
+- Si cierras la sesión SSH, el acceso desde el segundo equipo se corta.
+- Para que solo entren esos dos equipos, limita el SSH a la IP del segundo
+  equipo y usa preferiblemente autenticación con clave SSH.
+- Si no quieres instalar SSH, Tailscale o WireGuard son alternativas similares:
+  crean una red privada entre tus equipos y no exponen la app a toda la red.
+
 
 ## Instalar el certificado en los clientes
 
@@ -153,18 +207,9 @@ docker compose up -d
 También puedes usar el botón **Code → Download ZIP** de GitHub y ejecutar
 `docker compose up -d` dentro de la carpeta descomprimida.
 
-Por defecto, el compose también publica la aplicación solo en `127.0.0.1`.
-Para abrirla al resto de la red:
-
-```bash
-BIND_IP=0.0.0.0 docker compose up -d
-```
-
-En Windows CMD sería:
-
-```cmd
-set BIND_IP=0.0.0.0 && docker compose up -d
-```
+Por defecto, el compose también publica la aplicación solo en `127.0.0.1`. Si
+quieres entrar desde un segundo equipo, usa el túnel SSH de la sección
+**Acceso desde un segundo equipo**; no necesitas abrir el compose a la red.
 
 ## Cambiar los puertos
 

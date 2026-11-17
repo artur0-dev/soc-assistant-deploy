@@ -10,7 +10,8 @@
 # Wazuh y Splunk se configuran despues desde la interfaz de Integraciones.
 #
 # Por defecto la app solo escucha en localhost (127.0.0.1).
-# Para abrirla al resto de la red:
+# Para acceso desde un segundo equipo, usa el tunel SSH del README.
+# Si necesitas abrirla a toda la red (no recomendado):
 #   Windows CMD:  set BIND_IP=0.0.0.0 && docker compose up -d
 #   Linux/macOS:  BIND_IP=0.0.0.0 docker compose up -d
 #
