@@ -1,4 +1,4 @@
-﻿# SOC Assistant
+# SOC Assistant
 
 SOC Assistant es una aplicación web para el trabajo diario de un equipo SOC.
 Reúne alertas, casos e informes, y añade un asistente de IA que responde
